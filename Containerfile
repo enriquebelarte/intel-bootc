@@ -1,5 +1,5 @@
-ARG DRIVER_TOOLKIT_IMAGE="quay.io/ebelarte/driver-toolkit:020924"
-ARG BASEIMAGE="quay.io/centos-bootc/centos-bootc:stream9"
+ARG DRIVER_TOOLKIT_IMAGE=quay.io/ebelarte/driver-toolkit:020924
+ARG BASEIMAGE=quay.io/centos-bootc/centos-bootc:stream9
 
 FROM ${DRIVER_TOOLKIT_IMAGE} as builder
 

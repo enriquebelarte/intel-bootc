@@ -1,6 +1,6 @@
 ARG DRIVER_TOOLKIT_IMAGE=quay.io/ebelarte/driver-toolkit:020924
 ARG BASEIMAGE=quay.io/centos-bootc/centos-bootc:stream9
-
+ARG INSTRUCTLAB_IMAGE=MY_ILAB
 FROM ${DRIVER_TOOLKIT_IMAGE} as builder
 
 # NOTE: The entire Gaudi stack from Kernel drivers to PyTorch and Instructlab
@@ -34,7 +34,7 @@ ARG EXTRA_RPM_PACKAGES=''
 ARG VENDOR=''
 LABEL vendor=${VENDOR}
 LABEL org.opencontainers.image.vendor=${VENDOR}
-
+USER root
 COPY --from=builder /home/builder/usr/src/habanalabs-${DRIVER_VERSION}/drivers/accel/habanalabs/habanalabs.ko /tmp/extra/habanalabs.ko
 COPY --from=builder /home/builder/usr/src/habanalabs-${DRIVER_VERSION}/drivers/infiniband/hw/hbl/habanalabs_ib.ko /tmp/extra/habanalabs_ib.ko
 COPY --from=builder /home/builder/usr/src/habanalabs-${DRIVER_VERSION}/drivers/net/ethernet/intel/hbl_cn/habanalabs_cn.ko /tmp/extra/habanalabs_cn.ko
@@ -56,7 +56,6 @@ RUN dnf install -y ${EXTRA_RPM_PACKAGES} \
     && dnf clean all \
     && ln -s ../cloud-init.target /usr/lib/systemd/system/default.target.wants
 
-ARG INSTRUCTLAB_IMAGE="quay.io/ai-lab/instructlab-intel:latest"
 
 ARG SSHPUBKEY
 

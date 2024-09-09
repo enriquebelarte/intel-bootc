@@ -1,7 +1,7 @@
-ARG DRIVER_TOOLKIT_IMAGE=quay.io/ebelarte/driver-toolkit:020924
-ARG BASEIMAGE=quay.io/centos-bootc/centos-bootc:stream9
-ARG INSTRUCTLAB_IMAGE=MY_ILAB
+ARG BASEIMAGE=registry.redhat.io/rhel9/rhel-bootc:9.4-1724170399
+ARG DRIVER_TOOLKIT_IMAGE=registry.stage.redhat.io/rhelai1/driver-toolkit-rhel9:1.1-1724247729
 FROM ${DRIVER_TOOLKIT_IMAGE} as builder
+
 
 # NOTE: The entire Gaudi stack from Kernel drivers to PyTorch and Instructlab
 # must be updated in lockstep. Please coordinate updates with all
@@ -19,7 +19,7 @@ RUN . /etc/os-release \
     && rpm2cpio ${HABANA_REPO}/habanalabs-${DRIVER_VERSION}.el${OS_VERSION_MAJOR}.noarch.rpm | cpio -idmv \
     && rpm2cpio ${HABANA_REPO}/habanalabs-rdma-core-${DRIVER_VERSION}.el${OS_VERSION_MAJOR}.noarch.rpm | cpio -idmv \
     && rpm2cpio ${HABANA_REPO}/habanalabs-firmware-tools-${DRIVER_VERSION}.el${OS_VERSION_MAJOR}.${TARGET_ARCH}.rpm | cpio -idmv \
-    && rpm2cpio ${HABANA_REPO}/habanalabs-thunk-${DRIVER_VERSION}.el${OS_VERSION_MAJOR}.${TARGET_ARCH}.rpm | cpio -idmv \ 
+    && rpm2cpio ${HABANA_REPO}/habanalabs-thunk-${DRIVER_VERSION}.el${OS_VERSION_MAJOR}.${TARGET_ARCH}.rpm | cpio -idmv \
     && pushd usr/src/habanalabs-${DRIVER_VERSION} \
     && make -f Makefile.nic KVERSION=${KERNEL_VERSION}.${TARGET_ARCH} \
     && make -f Makefile KVERSION=${KERNEL_VERSION}.${TARGET_ARCH} \
@@ -34,12 +34,14 @@ ARG EXTRA_RPM_PACKAGES=''
 ARG VENDOR=''
 LABEL vendor=${VENDOR}
 LABEL org.opencontainers.image.vendor=${VENDOR}
-USER root
+
 COPY --from=builder /home/builder/usr/src/habanalabs-${DRIVER_VERSION}/drivers/accel/habanalabs/habanalabs.ko /tmp/extra/habanalabs.ko
 COPY --from=builder /home/builder/usr/src/habanalabs-${DRIVER_VERSION}/drivers/infiniband/hw/hbl/habanalabs_ib.ko /tmp/extra/habanalabs_ib.ko
 COPY --from=builder /home/builder/usr/src/habanalabs-${DRIVER_VERSION}/drivers/net/ethernet/intel/hbl_cn/habanalabs_cn.ko /tmp/extra/habanalabs_cn.ko
 COPY --from=builder /home/builder/usr/src/habanalabs-${DRIVER_VERSION}/drivers/net/ethernet/intel/hbl_en/habanalabs_en.ko /tmp/extra/habanalabs_en.ko
 COPY --from=builder /home/builder/lib/firmware/habanalabs /tmp/firmware/habanalabs
+#COPY --from=builder /home/builder/usr/src/etc/modules-load.d/habanalabs.conf /etc/modules-load.d/
+#COPY --from=builder /home/builder/usr/src/etc/udev/rules.d/10-habanalabs.rules /etc/udev/rules.d/
 
 RUN . /etc/os-release \
     && export OS_VERSION_MAJOR=$(echo ${VERSION} | cut -d'.' -f 1) \
@@ -50,11 +52,9 @@ RUN . /etc/os-release \
     && depmod -a ${KERNEL_VERSION}.${TARGET_ARCH}
 
 RUN dnf install -y ${EXTRA_RPM_PACKAGES} \
-    cloud-init \
     skopeo \
     rsync \
-    && dnf clean all \
-    && ln -s ../cloud-init.target /usr/lib/systemd/system/default.target.wants
+    && dnf clean all 
 
 
 ARG SSHPUBKEY
@@ -67,11 +67,3 @@ RUN if [ -n "${SSHPUBKEY}" ]; then \
 	    echo ${SSHPUBKEY} > /usr/ssh/root.keys && chmod 0600 /usr/ssh/root.keys; \
 fi
 
-# Prepull the instructlab image
-#RUN if [ -f "/run/.input/instructlab-intel/oci-layout" ]; then \
-#         IID=$(podman --root /usr/lib/containers/storage pull oci:/run/.input/instructlab-intel) && \
-#         podman --root /usr/lib/containers/storage image tag ${IID} ${INSTRUCTLAB_IMAGE}; \
-#    else \
-#         IID=$(sudo podman --root /usr/lib/containers/storage pull ${INSTRUCTLAB_IMAGE}); \
-#    fi
-#

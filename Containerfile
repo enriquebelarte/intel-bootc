@@ -1,8 +1,8 @@
 ARG BASEIMAGE=registry.redhat.io/rhel9/rhel-bootc:9.4-1724170399
 ARG DRIVER_TOOLKIT_IMAGE=registry.stage.redhat.io/rhelai1/driver-toolkit-rhel9:1.1-1724247729
+FROM ${DRIVER_TOOLKIT_IMAGE} as builder
 ARG HABANA_REPO="https://vault.habana.ai/artifactory/rhel/9/9.4"
 ARG DRIVER_VERSION=1.17.1-40
-FROM ${DRIVER_TOOLKIT_IMAGE} as builder
 
 
 # NOTE: The entire Gaudi stack from Kernel drivers to PyTorch and Instructlab
@@ -28,6 +28,7 @@ RUN . /etc/os-release \
 FROM ${BASEIMAGE}
 
 ARG DRIVER_VERSION=1.17.1-40
+ARG HABANA_REPO="https://vault.habana.ai/artifactory/rhel/9/9.4"
 ARG EXTRA_RPM_PACKAGES=''
 
 ARG VENDOR=''

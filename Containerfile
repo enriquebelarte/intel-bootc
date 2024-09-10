@@ -1,14 +1,13 @@
 ARG BASEIMAGE=registry.redhat.io/rhel9/rhel-bootc:9.4-1724170399
 ARG DRIVER_TOOLKIT_IMAGE=registry.stage.redhat.io/rhelai1/driver-toolkit-rhel9:1.1-1724247729
+ARG HABANA_REPO="https://vault.habana.ai/artifactory/rhel/9/9.4"
+ARG DRIVER_VERSION=1.17.1-40
 FROM ${DRIVER_TOOLKIT_IMAGE} as builder
 
 
 # NOTE: The entire Gaudi stack from Kernel drivers to PyTorch and Instructlab
 # must be updated in lockstep. Please coordinate updates with all
 # stakeholders.
-ARG DRIVER_VERSION=1.17.1-40
-ARG HABANA_REPO="https://vault.habana.ai/artifactory/rhel/9/9.4"
-
 WORKDIR /home/builder
 
 RUN . /etc/os-release \
@@ -40,8 +39,6 @@ COPY --from=builder /home/builder/usr/src/habanalabs-${DRIVER_VERSION}/drivers/i
 COPY --from=builder /home/builder/usr/src/habanalabs-${DRIVER_VERSION}/drivers/net/ethernet/intel/hbl_cn/habanalabs_cn.ko /tmp/extra/habanalabs_cn.ko
 COPY --from=builder /home/builder/usr/src/habanalabs-${DRIVER_VERSION}/drivers/net/ethernet/intel/hbl_en/habanalabs_en.ko /tmp/extra/habanalabs_en.ko
 COPY --from=builder /home/builder/lib/firmware/habanalabs /tmp/firmware/habanalabs
-#COPY --from=builder /home/builder/usr/src/etc/modules-load.d/habanalabs.conf /etc/modules-load.d/
-#COPY --from=builder /home/builder/usr/src/etc/udev/rules.d/10-habanalabs.rules /etc/udev/rules.d/
 
 RUN . /etc/os-release \
     && export OS_VERSION_MAJOR=$(echo ${VERSION} | cut -d'.' -f 1) \
@@ -53,6 +50,7 @@ RUN . /etc/os-release \
 
 RUN mv /etc/selinux /etc/selinux.tmp \
     && dnf install -y ${EXTRA_RPM_PACKAGES} \
+    ${HABANA_REPO}/habanalabs-firmware-tools-${DRIVER_VERSION}.el${OS_VERSION_MAJOR}.${TARGET_ARCH}.rpm \
     skopeo \
     rsync \
     && dnf clean all \

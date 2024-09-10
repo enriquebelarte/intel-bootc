@@ -47,9 +47,8 @@ RUN . /etc/os-release \
     && export TARGET_ARCH=$(rpm -q --qf '%{ARCH}' kernel-core) \
     && mv /tmp/extra /lib/modules/${KERNEL_VERSION}.${TARGET_ARCH} \
     && mv /tmp/firmware/habanalabs /lib/firmware \
-    && depmod -a ${KERNEL_VERSION}.${TARGET_ARCH}
-
-RUN mv /etc/selinux /etc/selinux.tmp \
+    && depmod -a ${KERNEL_VERSION}.${TARGET_ARCH} \
+    && mv /etc/selinux /etc/selinux.tmp \
     && dnf install -y ${EXTRA_RPM_PACKAGES} \
     ${HABANA_REPO}/habanalabs-firmware-tools-${DRIVER_VERSION}.el${OS_VERSION_MAJOR}.${TARGET_ARCH}.rpm \
     skopeo \

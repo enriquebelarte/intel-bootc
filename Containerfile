@@ -51,10 +51,12 @@ RUN . /etc/os-release \
     && mv /tmp/firmware/habanalabs /lib/firmware \
     && depmod -a ${KERNEL_VERSION}.${TARGET_ARCH}
 
-RUN dnf install -y ${EXTRA_RPM_PACKAGES} \
+RUN mv /etc/selinux /etc/selinux.tmp \
+    && dnf install -y ${EXTRA_RPM_PACKAGES} \
     skopeo \
     rsync \
-    && dnf clean all 
+    && dnf clean all \
+    && mv /etc/selinux.tmp /etc/selinux
 
 
 ARG SSHPUBKEY

@@ -41,17 +41,18 @@ COPY --from=builder /home/builder/usr/src/habanalabs-${DRIVER_VERSION}/drivers/n
 COPY --from=builder /home/builder/usr/src/habanalabs-${DRIVER_VERSION}/drivers/net/ethernet/intel/hbl_en/habanalabs_en.ko /tmp/extra/habanalabs_en.ko
 COPY --from=builder /home/builder/lib/firmware/habanalabs /tmp/firmware/habanalabs
 
+COPY --from=builder /home/builder/usr/bin/hl-smi /usr/bin/hl-smi
+
+
 RUN . /etc/os-release \
     && export OS_VERSION_MAJOR=$(echo ${VERSION} | cut -d'.' -f 1) \
     && export KERNEL_VERSION=$(rpm -q --qf '%{VERSION}-%{RELEASE}' kernel-core) \
     && export TARGET_ARCH=$(rpm -q --qf '%{ARCH}' kernel-core) \
-    && mv /tmp/extra /lib/modules/${KERNEL_VERSION}.${TARGET_ARCH} \
-    && mv /tmp/firmware/habanalabs /lib/firmware \
+    && mv /tmp/extra /lib/modules/${KERNEL_VERSION}.${TARGET_ARCH}     &&  mv /tmp/firmware/habanalabs /lib/firmware \
     && depmod -a ${KERNEL_VERSION}.${TARGET_ARCH} \
-    && mv /etc/selinux /etc/selinux.tmp \
-    && dnf install -y ${EXTRA_RPM_PACKAGES} \
-    ${HABANA_REPO}/habanalabs-firmware-tools-${DRIVER_VERSION}.el${OS_VERSION_MAJOR}.${TARGET_ARCH}.rpm \
-    skopeo \
+    && mv /etc/selinux /etc/selinux.tmp 
+
+RUN dnf install -y ${EXTRA_RPM_PACKAGES} \
     rsync \
     && dnf clean all \
     && mv /etc/selinux.tmp /etc/selinux

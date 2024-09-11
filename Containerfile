@@ -33,14 +33,16 @@ LABEL vendor=${VENDOR}
 LABEL org.opencontainers.image.vendor=${VENDOR}
 COPY habana.repo /etc/yum.repos.d/habana.repo
 RUN update-crypto-policies --set DEFAULT:SHA1
-RUN dnf -y install https://mirror.stream.centos.org/9-stream/CRB/x86_64/os/Packages/ninja-build-1.10.2-6.el9.x86_64.rpm \
+RUN mv /etc/selinux /etc/selinux.tmp \
+    && dnf -y install https://mirror.stream.centos.org/9-stream/CRB/x86_64/os/Packages/ninja-build-1.10.2-6.el9.x86_64.rpm \
     && dnf -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm \
     && dnf install -y habanalabs-rdma-core-${DRIVER_VERSION}.el9 \
     habanalabs-thunk-${DRIVER_VERSION}.el9 \
     habanalabs-firmware-tools-${DRIVER_VERSION}.el9 \
     habanalabs-graph-${DRIVER_VERSION}.el9 && \
     rm -f /etc/yum.repos.d/habanalabs.repo && rm -f /etc/yum.repos.d/habana.repo && rm -rf /tmp/* && \
-    dnf clean all && rm -rf /var/cache/yum
+    dnf clean all && rm -rf /var/cache/yum \
+    && mv /etc/selinux.tmp /etc/selinux
 
 COPY --from=builder /home/builder/usr/src/habanalabs-${DRIVER_VERSION}/drivers/accel/habanalabs/habanalabs.ko /tmp/extra/habanalabs.ko
 COPY --from=builder /home/builder/usr/src/habanalabs-${DRIVER_VERSION}/drivers/infiniband/hw/hbl/habanalabs_ib.ko /tmp/extra/habanalabs_ib.ko
@@ -51,6 +53,7 @@ COPY --from=builder /home/builder/lib/firmware/habanalabs /tmp/firmware/habanala
 
 
 RUN . /etc/os-release \
+    && echo "softdep habanalabs post: habanalabs_ib" > /etc/modprobe.d/habanalabs_ib.conf \
     && export OS_VERSION_MAJOR=$(echo ${VERSION} | cut -d'.' -f 1) \
     && export KERNEL_VERSION=$(rpm -q --qf '%{VERSION}-%{RELEASE}' kernel-core) \
     && export TARGET_ARCH=$(rpm -q --qf '%{ARCH}' kernel-core) \

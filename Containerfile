@@ -1,14 +1,13 @@
-ARG DRIVER_TOOLKIT_IMAGE=quay.io/ebelarte/driver-toolkit:020924
-ARG BASEIMAGE=quay.io/centos-bootc/centos-bootc:stream9
-
+ARG BASEIMAGE=registry.redhat.io/rhel9/rhel-bootc:9.4-1724170399
+ARG DRIVER_TOOLKIT_IMAGE=registry.stage.redhat.io/rhelai1/driver-toolkit-rhel9:1.1-1724247729
 FROM ${DRIVER_TOOLKIT_IMAGE} as builder
+ARG HABANA_REPO="https://vault.habana.ai/artifactory/rhel/9/9.4"
+ARG DRIVER_VERSION=1.17.1-40
+
 
 # NOTE: The entire Gaudi stack from Kernel drivers to PyTorch and Instructlab
 # must be updated in lockstep. Please coordinate updates with all
 # stakeholders.
-ARG DRIVER_VERSION=1.17.1-40
-ARG HABANA_REPO="https://vault.habana.ai/artifactory/rhel/9/9.4"
-
 WORKDIR /home/builder
 
 RUN . /etc/os-release \
@@ -17,9 +16,6 @@ RUN . /etc/os-release \
     && export TARGET_ARCH=$(rpm -q --qf '%{ARCH}' kernel-core) \
     && rpm2cpio ${HABANA_REPO}/habanalabs-firmware-${DRIVER_VERSION}.el${OS_VERSION_MAJOR}.${TARGET_ARCH}.rpm | cpio -idmv \
     && rpm2cpio ${HABANA_REPO}/habanalabs-${DRIVER_VERSION}.el${OS_VERSION_MAJOR}.noarch.rpm | cpio -idmv \
-    && rpm2cpio ${HABANA_REPO}/habanalabs-rdma-core-${DRIVER_VERSION}.el${OS_VERSION_MAJOR}.noarch.rpm | cpio -idmv \
-    && rpm2cpio ${HABANA_REPO}/habanalabs-firmware-tools-${DRIVER_VERSION}.el${OS_VERSION_MAJOR}.${TARGET_ARCH}.rpm | cpio -idmv \
-    && rpm2cpio ${HABANA_REPO}/habanalabs-thunk-${DRIVER_VERSION}.el${OS_VERSION_MAJOR}.${TARGET_ARCH}.rpm | cpio -idmv \ 
     && pushd usr/src/habanalabs-${DRIVER_VERSION} \
     && make -f Makefile.nic KVERSION=${KERNEL_VERSION}.${TARGET_ARCH} \
     && make -f Makefile KVERSION=${KERNEL_VERSION}.${TARGET_ARCH} \
@@ -29,11 +25,24 @@ RUN . /etc/os-release \
 FROM ${BASEIMAGE}
 
 ARG DRIVER_VERSION=1.17.1-40
+ARG HABANA_REPO="https://vault.habana.ai/artifactory/rhel/9/9.4"
 ARG EXTRA_RPM_PACKAGES=''
 
 ARG VENDOR=''
 LABEL vendor=${VENDOR}
 LABEL org.opencontainers.image.vendor=${VENDOR}
+COPY habana.repo /etc/yum.repos.d/habana.repo
+RUN update-crypto-policies --set DEFAULT:SHA1
+RUN mv /etc/selinux /etc/selinux.tmp \
+    && dnf -y install https://mirror.stream.centos.org/9-stream/CRB/x86_64/os/Packages/ninja-build-1.10.2-6.el9.x86_64.rpm \
+    && dnf -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm \
+    && dnf install -y habanalabs-rdma-core-${DRIVER_VERSION}.el9 \
+    habanalabs-thunk-${DRIVER_VERSION}.el9 \
+    habanalabs-firmware-tools-${DRIVER_VERSION}.el9 \
+    habanalabs-graph-${DRIVER_VERSION}.el9 && \
+    rm -f /etc/yum.repos.d/habanalabs.repo && rm -f /etc/yum.repos.d/habana.repo && rm -rf /tmp/* && \
+    dnf clean all && rm -rf /var/cache/yum \
+    && mv /etc/selinux.tmp /etc/selinux
 
 COPY --from=builder /home/builder/usr/src/habanalabs-${DRIVER_VERSION}/drivers/accel/habanalabs/habanalabs.ko /tmp/extra/habanalabs.ko
 COPY --from=builder /home/builder/usr/src/habanalabs-${DRIVER_VERSION}/drivers/infiniband/hw/hbl/habanalabs_ib.ko /tmp/extra/habanalabs_ib.ko
@@ -41,22 +50,22 @@ COPY --from=builder /home/builder/usr/src/habanalabs-${DRIVER_VERSION}/drivers/n
 COPY --from=builder /home/builder/usr/src/habanalabs-${DRIVER_VERSION}/drivers/net/ethernet/intel/hbl_en/habanalabs_en.ko /tmp/extra/habanalabs_en.ko
 COPY --from=builder /home/builder/lib/firmware/habanalabs /tmp/firmware/habanalabs
 
+
+
 RUN . /etc/os-release \
+    && echo "softdep habanalabs post: habanalabs_ib" > /etc/modprobe.d/habanalabs_ib.conf \
     && export OS_VERSION_MAJOR=$(echo ${VERSION} | cut -d'.' -f 1) \
     && export KERNEL_VERSION=$(rpm -q --qf '%{VERSION}-%{RELEASE}' kernel-core) \
     && export TARGET_ARCH=$(rpm -q --qf '%{ARCH}' kernel-core) \
-    && mv /tmp/extra /lib/modules/${KERNEL_VERSION}.${TARGET_ARCH} \
-    && mv /tmp/firmware/habanalabs /lib/firmware \
-    && depmod -a ${KERNEL_VERSION}.${TARGET_ARCH}
+    && mv /tmp/extra /lib/modules/${KERNEL_VERSION}.${TARGET_ARCH}     &&  mv /tmp/firmware/habanalabs /lib/firmware \
+    && depmod -a ${KERNEL_VERSION}.${TARGET_ARCH} \
+    && mv /etc/selinux /etc/selinux.tmp 
 
 RUN dnf install -y ${EXTRA_RPM_PACKAGES} \
-    cloud-init \
-    skopeo \
     rsync \
     && dnf clean all \
-    && ln -s ../cloud-init.target /usr/lib/systemd/system/default.target.wants
+    && mv /etc/selinux.tmp /etc/selinux
 
-ARG INSTRUCTLAB_IMAGE="quay.io/ai-lab/instructlab-intel:latest"
 
 ARG SSHPUBKEY
 
@@ -68,11 +77,3 @@ RUN if [ -n "${SSHPUBKEY}" ]; then \
 	    echo ${SSHPUBKEY} > /usr/ssh/root.keys && chmod 0600 /usr/ssh/root.keys; \
 fi
 
-# Prepull the instructlab image
-#RUN if [ -f "/run/.input/instructlab-intel/oci-layout" ]; then \
-#         IID=$(podman --root /usr/lib/containers/storage pull oci:/run/.input/instructlab-intel) && \
-#         podman --root /usr/lib/containers/storage image tag ${IID} ${INSTRUCTLAB_IMAGE}; \
-#    else \
-#         IID=$(sudo podman --root /usr/lib/containers/storage pull ${INSTRUCTLAB_IMAGE}); \
-#    fi
-#

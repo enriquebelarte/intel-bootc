@@ -16,9 +16,6 @@ RUN . /etc/os-release \
     && export TARGET_ARCH=$(rpm -q --qf '%{ARCH}' kernel-core) \
     && rpm2cpio ${HABANA_REPO}/habanalabs-firmware-${DRIVER_VERSION}.el${OS_VERSION_MAJOR}.${TARGET_ARCH}.rpm | cpio -idmv \
     && rpm2cpio ${HABANA_REPO}/habanalabs-${DRIVER_VERSION}.el${OS_VERSION_MAJOR}.noarch.rpm | cpio -idmv \
-    && rpm2cpio ${HABANA_REPO}/habanalabs-rdma-core-${DRIVER_VERSION}.el${OS_VERSION_MAJOR}.noarch.rpm | cpio -idmv \
-    && rpm2cpio ${HABANA_REPO}/habanalabs-firmware-tools-${DRIVER_VERSION}.el${OS_VERSION_MAJOR}.${TARGET_ARCH}.rpm | cpio -idmv \
-    && rpm2cpio ${HABANA_REPO}/habanalabs-thunk-${DRIVER_VERSION}.el${OS_VERSION_MAJOR}.${TARGET_ARCH}.rpm | cpio -idmv \
     && pushd usr/src/habanalabs-${DRIVER_VERSION} \
     && make -f Makefile.nic KVERSION=${KERNEL_VERSION}.${TARGET_ARCH} \
     && make -f Makefile KVERSION=${KERNEL_VERSION}.${TARGET_ARCH} \
@@ -34,6 +31,16 @@ ARG EXTRA_RPM_PACKAGES=''
 ARG VENDOR=''
 LABEL vendor=${VENDOR}
 LABEL org.opencontainers.image.vendor=${VENDOR}
+COPY habana.repo /etc/yum.repos.d/habana.repo
+RUN update-crypto-policies --set DEFAULT:SHA1
+RUN dnf -y install https://mirror.stream.centos.org/9-stream/CRB/x86_64/os/Packages/ninja-build-1.10.2-6.el9.x86_64.rpm \
+    && dnf -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm \
+    && dnf install -y habanalabs-rdma-core-${DRIVER_VERSION}.el9 \
+    habanalabs-thunk-${DRIVER_VERSION}.el9 \
+    habanalabs-firmware-tools-${DRIVER_VERSION}.el9 \
+    habanalabs-graph-${DRIVER_VERSION}.el9 && \
+    rm -f /etc/yum.repos.d/habanalabs.repo && rm -f /etc/yum.repos.d/habana.repo && rm -rf /tmp/* && \
+    dnf clean all && rm -rf /var/cache/yum
 
 COPY --from=builder /home/builder/usr/src/habanalabs-${DRIVER_VERSION}/drivers/accel/habanalabs/habanalabs.ko /tmp/extra/habanalabs.ko
 COPY --from=builder /home/builder/usr/src/habanalabs-${DRIVER_VERSION}/drivers/infiniband/hw/hbl/habanalabs_ib.ko /tmp/extra/habanalabs_ib.ko
@@ -41,7 +48,6 @@ COPY --from=builder /home/builder/usr/src/habanalabs-${DRIVER_VERSION}/drivers/n
 COPY --from=builder /home/builder/usr/src/habanalabs-${DRIVER_VERSION}/drivers/net/ethernet/intel/hbl_en/habanalabs_en.ko /tmp/extra/habanalabs_en.ko
 COPY --from=builder /home/builder/lib/firmware/habanalabs /tmp/firmware/habanalabs
 
-COPY --from=builder /home/builder/usr/bin/hl-smi /usr/bin/hl-smi
 
 
 RUN . /etc/os-release \

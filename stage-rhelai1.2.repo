@@ -1,0 +1,5 @@
+[extra-for-rhelai1.2-rpms]
+name=extra-for-rhelai1.2-rpms
+baseurl=https://rhsm-pulp.corp.stage.redhat.com/content/dist/layered/rhel9/x86_64/rhelai/1.2/os
+enabled=1
+gpgcheck=0
